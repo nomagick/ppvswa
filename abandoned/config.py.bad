@@ -1,0 +1,183 @@
+'''
+Created on 2012-6-25
+
+@author: avastms
+'''
+import re
+class RecordObj(object):
+	"""Bodycells of the config file """
+	def __init__(self , Name, Contant , Prefrences = None , Annotation = False , BAnnotation = None , Father = None):
+		self.Name = Name
+		self.Contant = Contant
+		self.Father = Father
+		self.Prefrences = Prefrences
+		self.Annotation = Annotation
+		self.BAnnotation = BAnnotation
+		return None
+
+	def __getitem__ (self, attrib) :
+		if type(attrib) == str and type(self.Contant) == list :
+			return [x for x in self.Contant[1:] if x.Name == attrib][0]
+		elif type(attrib) == int and type(self.Contant) == list :
+			return self.Contant[attrib]
+		else :
+			return None
+	def __str__ (self) :
+		return self.tostring()
+
+	def tostring (self , StyleDict= { 'Annotation' : '#' , 'LeftSection' : '[' , 'RightSection' : ']' , 'Equal' : '=' }) :
+		tempstr = ''
+		if self.issection() :
+			for x in self.Contant[1:] :
+				tempstr += x.tostring(StyleDict)
+			if bool(self.BAnnotation) == True :
+				tempstr =StyleDict['LeftSection'] + self.Name + StyleDict['RightSection'] + '\t' + StyleDict['Annotation'] + self.BAnnotation + '\n' + tempstr
+			elif bool(self.Name) == False :
+				pass
+			else : 
+				tempstr = '\n' + StyleDict['LeftSection'] + self.Name + StyleDict['RightSection'] + '\n' + tempstr
+			if bool(self.Annotation) :
+				tempstr = StyleDict['Annotation'] + tempstr
+			return tempstr
+		else :
+			if bool(self.BAnnotation) == True :
+				tempstr = '\t' + StyleDict['Annotation'] + self.BAnnotation + '\n'
+			else :
+				tempstr = '\n' 
+#			if type(self.Contant[0][0]) == type(None) :
+#				tempstr = ' ' + tempstr
+#			else :
+			cntstr = ''
+			for x in self.Contant[0] :
+				cntstr += '\t' + str(x)
+			tempstr = cntstr + tempstr
+			tempstr = self.Name + ' ' + StyleDict['Equal'] + ' ' + tempstr
+			if bool(self.Annotation) == True :
+				tempstr = StyleDict['Annotation'] + tempstr
+			return tempstr
+	def isroot (self) :
+		if self.Name == None :
+			return True
+		else :
+			return False
+	def issection (self) :
+		if self.Contant[0] == None :
+			return True
+		else :
+			return False
+	def isleaf (self) :
+		if self.Contant[0] != None :
+			return True
+		else :
+			return False
+	def insert (self , position , Name , Contant , Prefrences = None , Annotation = False , BAnnotation = None) :
+		if type(position) != int :
+			raise TypeError('Need a int for position .')
+			return None
+		if Contant == None :
+			self.Contant.insert(position , RecordObj( Name , [None] , Prefrences , Annotation , BAnnotation, self))
+		else :
+			self.Contant.insert(position , RecordObj( Name , [Contant] , Prefrences , Annotation , BAnnotation, self))
+		return self.Contant[position]
+	def append (self , Name , Contant , Prefrences = None , Annotation = False , BAnnotation = None) :
+		if Contant == None :
+			self.Contant.append(RecordObj( Name , [None] , Prefrences , Annotation , BAnnotation, self))
+		else :
+			self.Contant.append(RecordObj( Name , [Contant] , Prefrences , Annotation , BAnnotation, self))
+		return self.Contant[-1]
+	def update (self , **ChangeDict) :
+		for x in ChangeDict :
+			if x == 'Contant' :
+				self.Contant[0] = ChangeDict[x]
+			else :
+				setattr(self, x , ChangeDict[x] )
+	def remove (self) :
+		if self.Father != None : 	
+			self.Father.Contant.remove(self) 	
+		else :
+			del self
+
+
+class ConfigFile(object):
+	"""The One Class for text based config files. One class to rule them all."""
+#	StartMarkList = ['[$KeY]','<$KeY>','StartSection "$KeY"']
+#	EndMarkList = ['\s+','</$KeY>','EndSection']
+#	DivisionMarkList = ['\s+','\s+=\s+','\s+:\s+',]
+#	AnnotationMarkList = ['#',('/*','*/')]
+	def __init__(self, File):
+		self.File = File
+		try :
+			with open(File) as filehandle :
+				self.RawList = filehandle.readlines()
+		except IOError :
+			self.RawList = None
+		self.Body = None
+		return None;	
+
+	def __getitem__ (self, attrib) :
+		return self.Body[attrib]
+
+	def __str__(self) :
+		return str(self.Body)
+	def parse (self) :
+		return self.simple_parse()
+	def write (self) :
+		with open(self.File , 'w') as filehandle :
+			return filehandle.write(str(self))
+
+	def simple_parse (self , REString = r'^\s*(?P<Annotation>#+)?\s*(?:\[\s*(?P<Section>[^#\n\s]+)\s*(?P<SectionPreference>.+)?\])?\s*(?P<Key>[^#\n\s]+)?\s*=?\s*(?P<Value>[^#\n]+)?\s*(?:#+\s*(?P<BAnnotation>.+)?)?\s*$' , \
+	 InterfaceDict= {'Annotation':'Annotation' , 'Section':'Section' , 'SectionPreference' : 'SectionPreference', 'Key' : 'Key' , 'Value' : ['Value'] , 'BAnnotation' : 'BAnnotation' } ) :
+		Reg = RecordObj(None , [None] , None)		# Name==None is the characteristic of the Root (level 0) node. Contant[0]==None is the characteristic of Section (level 1) nodes. Contant[0]==list(...) is the characteristic of leaf (level 2) nodes.
+		self.Body = Reg
+		if self.RawList == None :
+			print ('Empty file , no need to parse.')
+			return
+		REO = re.compile(REString)
+		for line in self.RawList :
+			try :
+				MatchDict = REO.match(line).groupdict()
+			except :
+				break
+			if InterfaceDict['Section'] :
+				if MatchDict[ InterfaceDict['Section'] ] :
+					if Reg.Name != None :	#prohibit level 2+ sections.
+						Reg = Reg.Father
+					Reg = Reg.append(MatchDict[InterfaceDict['Section']] , None , MatchDict[InterfaceDict['SectionPreference']] if InterfaceDict['SectionPreference'] else None , MatchDict[InterfaceDict['Annotation']] if InterfaceDict['Annotation'] else None , MatchDict[InterfaceDict['BAnnotation']] if InterfaceDict['BAnnotation'] else None )
+			if MatchDict[ InterfaceDict['Key'] ] :
+				Reg.append ( MatchDict[ InterfaceDict['Key'] ]  ,[MatchDict[x] for x in InterfaceDict['Value'] ] , MatchDict[InterfaceDict['SectionPreference']] if InterfaceDict['SectionPreference'] else None, MatchDict[InterfaceDict['Annotation']] if InterfaceDict['Annotation'] else None , MatchDict[InterfaceDict['BAnnotation']] if InterfaceDict['BAnnotation'] else None )
+			if type(Reg.Contant[0]) == type(None) and bool(Reg.Annotation) : # Roll back inseration of Section if the Section is annotated.
+				Reg = Reg.Father
+		return self
+#	def parse (self,*Marks,DivisionList,AnnotationList) :
+#		self.Contant = RecordObj('' , [None] , None )
+#		workstack = [self.Contant]
+#		AnnotationFlag = False	
+#		MultiAnnStartRE ='^\s*(?P<Annotation>#*)\s*(?:\[\s*(?P<Section>\w+)\s*(?P<SectionPreference>.+)?\])?\s*(?P<Key>\b\w+\b)?\s*=?\s*(?P<Value>.+)?\s*(?:#+(?P<KeyPreference>.+)?)\s*$'
+#		InterfaceDict = { 'Annotation' : ( None , 'Annotation') , 'Name' : ('Section' , 'Key') , 'Contant' : (None , 'Value') , 'Preference' : (None , 'SectionPreference')}
+#		REString = '^\s*(?P<Annotation>#+)?\s*(?:\[\s*(?P<Section>\w+)\s*(?P<SectionPreference>.+)?\])?\s*(?P<Key>\b\w+\b)?\s*=?\s*(?P<Value>[^#\n]+)?\s*(?:#+\s*(?P<BAnnotation>.+)?)?\s*$'
+#		REO = re.compile(REString)
+#		for line in self.RawList :
+#			try:
+#				matchobj = REO.match(line)
+#				MatchDict = matchobj.groupdict()
+#			except :
+#				break
+#			if bool(MatchDict[InterfaceDict['Annotation'][1]]) :
+#				AnnotationFlag = True
+#			if bool(MatchDict[InterfaceDict['Name'][0]]) :
+#				workstack.append(RecordObj(MatchDict[InterfaceDict['Name'][0]] , [None] , workstack[-1] ))
+#			
+
+
+class ChapSecrets(ConfigFile):
+	'''
+	Class for chap-secrets file
+	'''
+	SecretList = [] ;
+	def chap_parse (self , REString = r'^\s*(?P<Annotation>#+)?\s*(?P<User>[^#\n\s]+)\s+(?P<Server>[^#\n\s]+)\s+(?P<Password>[^#\n\s]+)\s+(?:(?P<Ip>((\d{1,3}\.){3}\d{1,3})|\*))\s*(?:#+\s*(?P<BAnnotation>.+)?)?\s*$' , \
+		InterfaceDict= {'Annotation':'Annotation' , 'Section': None , 'SectionPreference' : None , 'Key' : 'User' , 'Value' : ['Server' , 'Password' , 'Ip' ] , 'BAnnotation' : 'BAnnotation' } ) :
+		self.simple_parse( REString , InterfaceDict )
+	def parse (self) :
+		return self.chap_parse()
+	def __str__ (self) :
+		return self.Body.tostring(StyleDict= { 'Annotation' : '#' , 'LeftSection' : '' , 'RightSection' : '' , 'Equal' : '\t' })

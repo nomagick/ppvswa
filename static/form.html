@@ -1,0 +1,48 @@
+<script type="text/javascript" src="http://code.jquery.com/jquery-1.9.1.min.js"></script>
+<script type="text/javascript" src="fto.js"></script>
+<script type="text/javascript">
+	function callback (data) {
+		if (data["err"]) {
+			jQuery("#vpnresult").text("Server exception: "+ data['detail']);
+			jQuery("#vpnbutton").prop("disabled",false);
+			jQuery("#vpnbutton").text("Retry");
+		}
+		else {
+			jQuery("#vpnresult").text("Congratulations, your account has been created.");
+			jQuery("#vpnbutton").text("Success");
+		}
+	}
+
+	function vpnsubmit () {
+		jQuery("#vpnbutton").prop("disabled",true);
+		jQuery("#vpnbutton").text("Please wait...");
+		jQuery.post("http://vpn.jhxs.org/signup.ajax", JSON.stringify(jQuery("#vpnform").toObject()), callback, "json").fail(
+			function (_,_,det) {
+			jQuery("#vpnresult").text("Network exception: "+ det);
+			jQuery("#vpnbutton").prop("disabled",false);
+			jQuery("#vpnbutton").text("Retry");
+		});
+		}
+
+</script>
+<div>
+	<h2 id="vpnresult"></h2>
+	<form id="vpnform">
+		<table>
+			<tr><td><strong>Email</strong><br> Email as your VPN username.</td>
+				<td><input type="text" name="_id"></td>
+			</tr>
+			<tr><td><strong>Password</strong><br> Set your VPN password.</td>
+				<td><input type="text" name="passwd"></td>
+			</tr>
+			<tr><td><strong>Message</strong><br> Leave a message to us.</td>
+				<td><input type="textarea" name="message"></td>
+			</tr>
+			<tr><td><strong>Submit</strong></td>
+				<td><button id="vpnbutton" onclick="vpnsubmit()">Submit</button></td>
+			</tr>
+
+		</table>
+
+	</form>
+</div>
